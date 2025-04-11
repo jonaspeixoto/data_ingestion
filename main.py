@@ -60,7 +60,7 @@ with engine.begin() as conn:
         if resultado:
             continue
 
-        insert = text("""
+        insert_cliente = text("""
             INSERT INTO tbl_clientes (
                 nome_razao_social,
                 nome_fantasia,
@@ -89,13 +89,22 @@ with engine.begin() as conn:
         if data_cadastro:
             data_cadastro = data_cadastro.date()
             
-        conn.execute(insert, {
-            "nome_razao_social": row.get("Nome/Razão Social"),
-            "nome_fantasia": row.get("Nome Fantasia"),
-            "cpf_cnpj": cpf_cnpj,
-            "data_nascimento": row.get("Data Nasc."),
-            "data_cadastro": row.get("Data Cadastro cliente")
-        })
+        # conn.execute(insert_cliente, {
+        #     "nome_razao_social": row.get("Nome/Razão Social"),
+        #     "nome_fantasia": row.get("Nome Fantasia"),
+        #     "cpf_cnpj": cpf_cnpj,
+        #     "data_nascimento": row.get("Data Nasc."),
+        #     "data_cadastro": row.get("Data Cadastro cliente")
+        # })
+        
+        
+        conn.execute(text("""
+            INSERT INTO tbl_tipos_contato (tipo_contato) VALUES 
+                ('Celular'),
+                ('Telefone'),
+                ('E-mail')
+            ON CONFLICT (tipo) DO NOTHING
+        """))
 
         total_inseridos += 1
     
