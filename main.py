@@ -89,13 +89,13 @@ with engine.begin() as conn:
         if data_cadastro:
             data_cadastro = data_cadastro.date()
             
-        # conn.execute(insert_cliente, {
-        #     "nome_razao_social": row.get("Nome/Razão Social"),
-        #     "nome_fantasia": row.get("Nome Fantasia"),
-        #     "cpf_cnpj": cpf_cnpj,
-        #     "data_nascimento": row.get("Data Nasc."),
-        #     "data_cadastro": row.get("Data Cadastro cliente")
-        # })
+        conn.execute(insert_cliente, {
+            "nome_razao_social": row.get("Nome/Razão Social"),
+            "nome_fantasia": row.get("Nome Fantasia"),
+            "cpf_cnpj": cpf_cnpj,
+            "data_nascimento": row.get("Data Nasc."),
+            "data_cadastro": row.get("Data Cadastro cliente")
+        })
         
         
         conn.execute(text("""
@@ -103,9 +103,48 @@ with engine.begin() as conn:
                 ('Celular'),
                 ('Telefone'),
                 ('E-mail')
-            ON CONFLICT (tipo) DO NOTHING
+            ON CONFLICT (tipo_contato) DO NOTHING
         """))
+        
+        cliente_id = conn.execute(
+            text("SELECT id FROM tbl_clientes WHERE cpf_cnpj = :cpf_cnpj"),
+            {"cpf_cnpj": cpf_cnpj}
+        ).scalar()
 
+        tipo_celular_id = conn.execute(text("SELECT id FROM tbl_tipos_contato WHERE tipo_contato = 'Celular'")).scalar()
+        tipo_telefone_id = conn.execute(text("SELECT id FROM tbl_tipos_contato WHERE tipo_contato = 'Telefone'")).scalar()
+        tipo_email_id = conn.execute(text("SELECT id FROM tbl_tipos_contato WHERE tipo_contato = 'E-mail'")).scalar()
+        
+        if row.get("Celulares"):
+            conn.execute(text("""
+                INSERT INTO tbl_cliente_contatos (cliente_id, tipo_contato_id, contato)
+                VALUES (:cliente_id, :tipo_contato_id, :contato)
+            """), {
+                "cliente_id": cliente_id,
+                "tipo_contato_id": tipo_celular_id,
+                "contato": str(row.get("Celulares"))
+            })
+
+        if row.get("Telefones"):
+            conn.execute(text("""
+                INSERT INTO tbl_cliente_contatos (cliente_id, tipo_contato_id, contato)
+                VALUES (:cliente_id, :tipo_contato_id, :contato)
+            """), {
+                "cliente_id": cliente_id,
+                "tipo_contato_id": tipo_telefone_id,
+                "contato": str(row.get("Telefones"))
+            })
+
+        if row.get("Emails"):
+            conn.execute(text("""
+                INSERT INTO tbl_cliente_contatos (cliente_id, tipo_contato_id, contato)
+                VALUES (:cliente_id, :tipo_contato_id, :contato)
+            """), {
+                "cliente_id": cliente_id,
+                "tipo_contato_id": tipo_email_id,
+                "contato": row.get("Emails")
+            })
+        
         total_inseridos += 1
     
     print(f"Total de clientes inseridos: {total_inseridos}")
