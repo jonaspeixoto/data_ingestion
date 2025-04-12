@@ -4,10 +4,9 @@ from dotenv import load_dotenv
 import os
 import pandas as pd
 import re
-# from utils import 
+
 
 # Implementaçao, configuração das variaveis de ambiente e drive de conexão com o banco de dados
-
 load_dotenv()
 
 DB_USER = os.getenv("DB_USER")
@@ -16,19 +15,19 @@ DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
 
-
 engine = create_engine(f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}')
 
-# Variaveis Globais
 
+# Variaveis Globais
 total_inseridos = 0
 registros_validos = []
 registros_invalidos = []
 cpf_cnpj_ja_vistos = []
 
-# Leitura da base de dados e remoção de incossistencias. 
 
+# Leitura da base de dados, remoção de incossistencias e tatamento de dados. 
 df = pd.read_excel('data/base_dados.xlsx')
+df = df.drop_duplicates()
 
 mapeamento_uf = {
     'Paraná': 'PR',
@@ -60,7 +59,7 @@ mapeamento_uf = {
     'Maranhão': 'MA'
 }
 
-df = df.drop_duplicates()
+
 df['UF'] = df['UF'].map(mapeamento_uf)
 df['Endereço'] = df['Endereço'].fillna('')
 
@@ -93,17 +92,13 @@ for i, row in df.iterrows():
         df['Endereço'] = df['Endereço'].fillna('')
         registros_validos.append(row)
 
-print(registros_invalidos[0])
+# print(registros_invalidos)
 
 
-
-print("")
 print(f' Quantidade de registros invalidos {len(registros_invalidos)}')
-
 print(f' Quantidade de registros validos {len(registros_validos)}')
 
-
-# # Conexão com banco de dados
+# Conexão com banco de dados
 
 with engine.begin() as conn:
     for row in registros_validos:
@@ -114,9 +109,8 @@ with engine.begin() as conn:
             {"cpf_cnpj": cpf_cnpj}
         ).scalar()
         
-        # print(cliente)
         if not cliente:  
-            # print('entrei')        
+
             # Populando Tabela de clientes se o cliente não existir no banco de dados
             insert_cliente = text("""
                 INSERT INTO tbl_clientes (
@@ -134,6 +128,7 @@ with engine.begin() as conn:
                 )
                 RETURNING id
             """)
+
             # Se o nome fantasia for em branco colocar valor padrão como não informado
             if pd.isna(row.get("Nome Fantasia")):
                 row["Nome Fantasia"] = "Não Informado"
@@ -157,8 +152,8 @@ with engine.begin() as conn:
             })
             cliente_id = novo_cliente.scalar()
         else:
-            # print('Cliente já existente')
             cliente_id = cliente
+            print(f'Cliente {row.get("Nome/Razão Social")} de Cpf/cnpj:{cpf_cnpj} já foi cadastrado')
 
         # Populando tabela de Tipos de contato
         conn.execute(text("""
@@ -170,7 +165,6 @@ with engine.begin() as conn:
         """))
 
         # Populando tabela de contatos de clientes
-        
         tipo_celular_id = conn.execute(text("SELECT id FROM tbl_tipos_contato WHERE tipo_contato = 'Celular'")).scalar()
         tipo_telefone_id = conn.execute(text("SELECT id FROM tbl_tipos_contato WHERE tipo_contato = 'Telefone'")).scalar()
         tipo_email_id = conn.execute(text("SELECT id FROM tbl_tipos_contato WHERE tipo_contato = 'E-mail'")).scalar()
