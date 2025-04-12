@@ -20,6 +20,10 @@ engine = create_engine(f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT
 
 # Variaveis Globais
 total_inseridos = 0
+clientes_inseridos = 0
+clientes_existentes = 0
+contatos_inseridos = 0
+contratos_inseridos = 0
 registros_validos = []
 registros_invalidos = []
 cpf_cnpj_ja_vistos = []
@@ -75,11 +79,6 @@ for i, row in df.iterrows():
     if len(cep) != 8:
         motivos_erro.append("Formato de CEP inválido")
         
-    # if cpf_cnpj in cpf_cnpj_ja_vistos:
-    #         motivos_erro.append("Duplicado na base de dados")
-    # else:
-    #     cpf_cnpj_ja_vistos.append(cpf_cnpj)
-
     if motivos_erro:
         registros_invalidos.append({
             "linha": row.to_dict(),
@@ -92,15 +91,10 @@ for i, row in df.iterrows():
         df['Endereço'] = df['Endereço'].fillna('')
         registros_validos.append(row)
 
-# print(registros_invalidos)
-
-
-print(f' Quantidade de registros invalidos {len(registros_invalidos)}')
-print(f' Quantidade de registros validos {len(registros_validos)}')
 
 # Conexão com banco de dados
-
 with engine.begin() as conn:
+    print("Inserindo registros...")
     for row in registros_validos:
         cpf_cnpj = row["cpf_cnpj"]
 
@@ -110,7 +104,6 @@ with engine.begin() as conn:
         ).scalar()
         
         if not cliente:  
-
             # Populando Tabela de clientes se o cliente não existir no banco de dados
             insert_cliente = text("""
                 INSERT INTO tbl_clientes (
@@ -151,8 +144,10 @@ with engine.begin() as conn:
                 "data_cadastro": row.get("Data Cadastro cliente")
             })
             cliente_id = novo_cliente.scalar()
+            clientes_inseridos +=1
         else:
             cliente_id = cliente
+            clientes_existentes += 1
             print(f'Cliente {row.get("Nome/Razão Social")} de Cpf/cnpj:{cpf_cnpj} já foi cadastrado')
 
         # Populando tabela de Tipos de contato
@@ -274,26 +269,45 @@ with engine.begin() as conn:
         if row.get('Isento') == "Sim":
             isento = True
         else:
-            inseto = False
+            isento = False
 
-        conn.execute(insert_cliente_contratos, {
-            "cliente_id": cliente_id,
-            "plano_id": plano_id,
-            "dia_vencimento": row.get("Vencimento"),
-            "isento":inseto,
-            "endereco_logradouro": row.get("Endereço"),
-            "endereco_numero":row.get("Número"),
-            "endereco_bairro":row.get("Bairro"),
-            "endereco_cidade":row.get("Cidade"),
-            "endereco_complemento":row.get("Complemento"),
-            "endereco_cep":row.get("CEP"),
-            "endereco_uf":row.get("UF"),
-            "status_id":status_id
-        })
 
-        total_inseridos += 1
-    
-print(f"Total de clientes inseridos: {total_inseridos}")
+        existe = conn.execute(text("""
+            SELECT * FROM tbl_cliente_contratos
+            WHERE cliente_id = :cliente_id
+            AND plano_id = :plano_id
+        """), {
+        'cliente_id': cliente_id,
+        'plano_id': plano_id,
+        }).fetchone()
+
+        if not existe:
+            conn.execute(insert_cliente_contratos, {
+                "cliente_id": cliente_id,
+                "plano_id": plano_id,
+                "dia_vencimento": row.get("Vencimento"),
+                "isento":isento,
+                "endereco_logradouro": row.get("Endereço"),
+                "endereco_numero":row.get("Número"),
+                "endereco_bairro":row.get("Bairro"),
+                "endereco_cidade":row.get("Cidade"),
+                "endereco_complemento":row.get("Complemento"),
+                "endereco_cep":row.get("CEP"),
+                "endereco_uf":row.get("UF"),
+                "status_id":status_id
+            })
+
+print("Registros Inserido com sucesso...")    
+print(f"\nTotal de registros processados: {len(df)}")
+print(f"Registros válidos: {len(registros_validos)}")
+print(f"Registros inválidos: {len(registros_invalidos)}")
+print(f"\nClientes novos inseridos: {clientes_inseridos}")
+print(f"Clientes já existentes: {clientes_existentes}")
+
+
+df = pd.json_normalize(registros_invalidos)
+df.columns = df.columns.str.replace('linha.', '')
+df.to_excel('clientes.xlsx', index=False)
 
 
 
