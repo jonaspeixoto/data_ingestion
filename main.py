@@ -294,7 +294,7 @@ for i, row in df.iterrows():
     cep = re.sub(r"\D", "", str(row.get("CEP", "")))
     
     if len(cpf_cnpj) != 11 and len(cpf_cnpj) != 14:
-        motivos_erro.append("Formato de CPF/CNPJ inválido")
+        motivos_erro.append("Cliente não cadastrados CPF/CNPJ inválido")
     
     if motivos_erro:
         registros_invalidos.append({
