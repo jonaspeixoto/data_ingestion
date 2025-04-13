@@ -172,7 +172,7 @@ with engine.begin() as conn:
             """), {
                 "cliente_id": cliente_id,
                 "tipo_contato_id": tipo_celular_id,
-                "contato": str(row.get("Celulares"))
+                "contato": str(row.get("Celulares")).rstrip('.0')
             })
         if not pd.isna(row.get("Telefones")):
             conn.execute(text("""
@@ -182,7 +182,7 @@ with engine.begin() as conn:
             """), {
                 "cliente_id": cliente_id,
                 "tipo_contato_id": tipo_telefone_id,
-                "contato": str(row.get("Telefones"))
+                "contato": str(row.get("Telefones")).rstrip('.0')
             })
 
         if not pd.isna(row.get("Emails")):
@@ -276,11 +276,11 @@ with engine.begin() as conn:
             SELECT * FROM tbl_cliente_contratos
             WHERE cliente_id = :cliente_id
             AND plano_id = :plano_id
+            AND plano_id = :endereco_cep
         """), {
         'cliente_id': cliente_id,
         'plano_id': plano_id,
         'endereco_cep': row.get("CEP"),
-        'endereco_numero': row.get("Número"),
         }).fetchone()
 
         if not existe:
