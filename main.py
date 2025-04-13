@@ -279,6 +279,8 @@ with engine.begin() as conn:
         """), {
         'cliente_id': cliente_id,
         'plano_id': plano_id,
+        'endereco_cep': row.get("CEP"),
+        'endereco_numero': row.get("Número"),
         }).fetchone()
 
         if not existe:
@@ -297,7 +299,7 @@ with engine.begin() as conn:
                 "status_id":status_id
             })
 
-print("Registros Inserido com sucesso...")    
+print("\nRegistros Inserido com sucesso!")    
 print(f"\nTotal de registros processados: {len(df)}")
 print(f"Registros válidos: {len(registros_validos)}")
 print(f"Registros inválidos: {len(registros_invalidos)}")
@@ -307,7 +309,7 @@ print(f"Clientes já existentes: {clientes_existentes}")
 
 df = pd.json_normalize(registros_invalidos)
 df.columns = df.columns.str.replace('linha.', '')
-df.to_excel('clientes.xlsx', index=False)
+df.to_excel('registros_nao_cadastrados.xlsx', index=False)
 
 
 
