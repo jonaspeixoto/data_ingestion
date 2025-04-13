@@ -83,20 +83,26 @@ def inserir_tipos_contatos(conn):
 def inserir_contatos(conn, row):
     if not pd.isna(row.get("Celulares")):
             conn.execute(text("""
+                              
                 INSERT INTO tbl_cliente_contatos (cliente_id, tipo_contato_id, contato)
                 VALUES (:cliente_id, :tipo_contato_id, :contato)
                 ON CONFLICT (cliente_id, tipo_contato_id, contato) DO NOTHING
-            """), {
+                              
+            """), 
+            {
                 "cliente_id": cliente_id,
                 "tipo_contato_id": tipo_celular_id,
                 "contato": str(row.get("Celulares")).rstrip('.0')
             })
+
     if not pd.isna(row.get("Telefones")):
         conn.execute(text("""
+                          
             INSERT INTO tbl_cliente_contatos (cliente_id, tipo_contato_id, contato)
             VALUES (:cliente_id, :tipo_contato_id, :contato)
             ON CONFLICT (cliente_id, tipo_contato_id, contato) DO NOTHING
-        """), {
+        """),
+        {
             "cliente_id": cliente_id,
             "tipo_contato_id": tipo_telefone_id,
             "contato": str(row.get("Telefones")).rstrip('.0')
@@ -107,7 +113,8 @@ def inserir_contatos(conn, row):
             INSERT INTO tbl_cliente_contatos (cliente_id, tipo_contato_id, contato)
             VALUES (:cliente_id, :tipo_contato_id, :contato)
             ON CONFLICT (cliente_id, tipo_contato_id, contato) DO NOTHING
-        """), {
+        """), 
+        {
             "cliente_id": cliente_id,
             "tipo_contato_id": tipo_email_id,
             "contato": row.get("Emails")
@@ -115,14 +122,13 @@ def inserir_contatos(conn, row):
     
 def inserir_plano(conn, row):
     insert_planos = text("""
-        INSERT INTO tbl_planos (
-            descricao,
-            valor         
-        ) VALUES (
-            :descricao,
-            :valor
-        ) ON CONFLICT (descricao) DO NOTHING
+                         
+        INSERT INTO tbl_planos (descricao, valor) 
+        VALUES (:descricao, :valor) 
+        ON CONFLICT (descricao) DO NOTHING
+                         
     """)
+
     conn.execute(insert_planos, {
         "descricao": row.get("Plano"),
         "valor": row.get("Plano Valor"),
@@ -130,12 +136,13 @@ def inserir_plano(conn, row):
 
 def inserir_status(conn, row):
     insert_satus = text("""
-        INSERT INTO tbl_status_contrato (
-            status     
-        ) VALUES (
-            :status
-        ) ON CONFLICT (status) DO NOTHING
+                        
+        INSERT INTO tbl_status_contrato (status) 
+        VALUES (:status) 
+        ON CONFLICT (status) DO NOTHING
+                        
     """)
+    
     conn.execute(insert_satus, {
         "status": row.get("Status"),
     })
@@ -178,11 +185,14 @@ def inserir_contrato(conn, row):
 
 
     existe = conn.execute(text("""
+                               
         SELECT * FROM tbl_cliente_contratos
         WHERE cliente_id = :cliente_id
         AND plano_id = :plano_id
         AND endereco_cep = :endereco_cep
-    """), {
+                               
+    """), 
+    {
     'cliente_id': cliente_id,
     'plano_id': plano_id,
     'endereco_cep': row.get("CEP"),
