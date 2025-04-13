@@ -2,7 +2,6 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 import os
-import pandas as pd
 import re
 
 
@@ -18,15 +17,20 @@ DB_NAME = os.getenv("DB_NAME")
 engine = create_engine(f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}')
 
 
-# Variaveis Globais
 total_inseridos = 0
 clientes_inseridos = 0
-clientes_existentes = 0
-contatos_inseridos = 0
 contratos_inseridos = 0
+clientes_existentes = 0
 registros_validos = []
 registros_invalidos = []
 cpf_cnpj_ja_vistos = []
+
+def validar_campos(campos_obrigatorios, row):
+    for campo in campos_obrigatorios:
+        if row[campo] is None or row[campo] == '':
+            return campo
+    return True
+    
 
 
 def inserir_cliente(conn, row):
@@ -66,7 +70,7 @@ def inserir_cliente(conn, row):
         clientes_inseridos+=1
     else:
         global clientes_existentes
-        clientes_existentes += 1
+        clientes_existentes+=1
         print(f'Cliente {row.get("Nome/Razão Social")} de Cpf/cnpj:{cpf_cnpj} já foi cadastrado')
 
 
@@ -80,7 +84,12 @@ def inserir_tipos_contatos(conn):
              
         """))
     
-def inserir_contatos(conn, row):
+def inserir_contatos(conn, row, cliente_id):
+    
+    tipo_celular_id = conn.execute(text("SELECT id FROM tbl_tipos_contato WHERE tipo_contato = 'Celular'")).scalar()
+    tipo_telefone_id = conn.execute(text("SELECT id FROM tbl_tipos_contato WHERE tipo_contato = 'Telefone'")).scalar()
+    tipo_email_id = conn.execute(text("SELECT id FROM tbl_tipos_contato WHERE tipo_contato = 'E-mail'")).scalar()
+
     if not pd.isna(row.get("Celulares")):
             conn.execute(text("""
                               
@@ -147,72 +156,97 @@ def inserir_status(conn, row):
         "status": row.get("Status"),
     })
 
-def inserir_contrato(conn, row):
-    insert_cliente_contratos = text("""
-            INSERT INTO tbl_cliente_contratos (
-                cliente_id,
-                plano_id,
-                dia_vencimento,
-                isento,
-                endereco_logradouro,
-                endereco_numero,
-                endereco_bairro,
-                endereco_cidade,
-                endereco_complemento,
-                endereco_cep,
-                endereco_uf,
-                status_id
-            ) VALUES (
-                :cliente_id,
-                :plano_id,
-                :dia_vencimento,
-                :isento,
-                :endereco_logradouro,
-                :endereco_numero,
-                :endereco_bairro,
-                :endereco_cidade,
-                :endereco_complemento,
-                :endereco_cep,
-                :endereco_uf,
-                :status_id
-            )
-        """)
+def inserir_contrato(conn, row, cliente_id):
+    campos_obrigatorios = ['Vencimento','Endereço','Número','Bairro','Cidade','CEP','UF']
 
-    if row.get('Isento') == "Sim":
-        isento = True
-    else:
-        isento = False
+    plano_id = conn.execute(text("SELECT id FROM tbl_planos WHERE descricao = :descricao"),{"descricao": row.get("Plano")}).scalar()
+    status_id = conn.execute(text("SELECT id FROM tbl_status_contrato WHERE status = :status"),{"status": row.get("Status")}).scalar()
 
-
-    existe = conn.execute(text("""
-                               
-        SELECT * FROM tbl_cliente_contratos
-        WHERE cliente_id = :cliente_id
-        AND plano_id = :plano_id
-        AND endereco_cep = :endereco_cep
-                               
-    """), 
-    {
-    'cliente_id': cliente_id,
-    'plano_id': plano_id,
-    'endereco_cep': row.get("CEP"),
-    }).fetchone()
-
-    if not existe:
-        conn.execute(insert_cliente_contratos, {
-            "cliente_id": cliente_id,
-            "plano_id": plano_id,
-            "dia_vencimento": row.get("Vencimento"),
-            "isento":isento,
-            "endereco_logradouro": row.get("Endereço"),
-            "endereco_numero":row.get("Número"),
-            "endereco_bairro":row.get("Bairro"),
-            "endereco_cidade":row.get("Cidade"),
-            "endereco_complemento":row.get("Complemento"),
-            "endereco_cep":row.get("CEP"),
-            "endereco_uf":row.get("UF"),
-            "status_id":status_id
+    if len(row.get('CEP')) != 8:
+        motivos_erro.append("Formato de CEP inválido")
+        global registros_invalidos
+        registros_invalidos.append({
+            "linha": row.to_dict(),
+            "erros": f' contrato do cliente não realizado cep invalido'
         })
+    else:
+        valido = validar_campos(campos_obrigatorios, row)
+        if valido == True:
+            insert_cliente_contratos = text("""
+                    INSERT INTO tbl_cliente_contratos (
+                        cliente_id,
+                        plano_id,
+                        dia_vencimento,
+                        isento,
+                        endereco_logradouro,
+                        endereco_numero,
+                        endereco_bairro,
+                        endereco_cidade,
+                        endereco_complemento,
+                        endereco_cep,
+                        endereco_uf,
+                        status_id
+                    ) VALUES (
+                        :cliente_id,
+                        :plano_id,
+                        :dia_vencimento,
+                        :isento,
+                        :endereco_logradouro,
+                        :endereco_numero,
+                        :endereco_bairro,
+                        :endereco_cidade,
+                        :endereco_complemento,
+                        :endereco_cep,
+                        :endereco_uf,
+                        :status_id
+                    )
+                """)
+
+            if row.get('Isento') == "Sim":
+                isento = True
+            else:
+                isento = False
+
+
+            existe = conn.execute(text("""
+                                    
+                SELECT * FROM tbl_cliente_contratos
+                WHERE cliente_id = :cliente_id
+                AND plano_id = :plano_id
+                AND endereco_cep = :endereco_cep
+                                    
+            """), 
+            {
+            'cliente_id': cliente_id,
+            'plano_id': plano_id,
+            'endereco_cep': row.get("CEP"),
+            }).fetchone()
+
+            if not existe:
+                conn.execute(insert_cliente_contratos, {
+                    "cliente_id": cliente_id,
+                    "plano_id": plano_id,
+                    "dia_vencimento": row.get("Vencimento"),
+                    "isento":isento,
+                    "endereco_logradouro": row.get("Endereço"),
+                    "endereco_numero":row.get("Número"),
+                    "endereco_bairro":row.get("Bairro"),
+                    "endereco_cidade":row.get("Cidade"),
+                    "endereco_complemento":row.get("Complemento"),
+                    "endereco_cep":row.get("CEP"),
+                    "endereco_uf":row.get("UF"),
+                    "status_id":status_id
+                })
+
+                global contratos_inseridos
+                contratos_inseridos += 1
+        else:
+            registros_invalidos.append({
+                "linha": row.to_dict(),
+                "erros": f' contrato do cliente não realizado campos {valido} não preenchidos'
+            })
+        
+
 
 
 # Leitura da base de dados, remoção de incossistencias e tatamento de dados. 
@@ -261,13 +295,7 @@ for i, row in df.iterrows():
     
     if len(cpf_cnpj) != 11 and len(cpf_cnpj) != 14:
         motivos_erro.append("Formato de CPF/CNPJ inválido")
-
-    if len(cep) != 8:
-        motivos_erro.append("Formato de CEP inválido")
-
-    # if pd.isna(row.get('Endereço')):
-    #     motivos_erro.append("Endereço em branco")
-        
+    
     if motivos_erro:
         registros_invalidos.append({
             "linha": row.to_dict(),
@@ -281,35 +309,24 @@ for i, row in df.iterrows():
         registros_validos.append(row)
 
 
-# Conexão com banco de dados
 with engine.begin() as conn:
     print("Inserindo registros...")
     for row in registros_validos:
         inserir_cliente(conn, row)
         cliente_id = conn.execute(text("SELECT id FROM tbl_clientes WHERE cpf_cnpj = :cpf_cnpj"),{"cpf_cnpj": row.get("cpf_cnpj")}).scalar()
         inserir_tipos_contatos(conn)
-        
-        tipo_celular_id = conn.execute(text("SELECT id FROM tbl_tipos_contato WHERE tipo_contato = 'Celular'")).scalar()
-        tipo_telefone_id = conn.execute(text("SELECT id FROM tbl_tipos_contato WHERE tipo_contato = 'Telefone'")).scalar()
-        tipo_email_id = conn.execute(text("SELECT id FROM tbl_tipos_contato WHERE tipo_contato = 'E-mail'")).scalar()
-        
-        inserir_contatos(conn, row)
+        inserir_contatos(conn, row, cliente_id)
         inserir_plano(conn, row)
         inserir_status(conn, row)
+        inserir_contrato(conn, row, cliente_id)
 
-        plano_id = conn.execute(text("SELECT id FROM tbl_planos WHERE descricao = :descricao"),{"descricao": row.get("Plano")}).scalar()
-        status_id = conn.execute(text("SELECT id FROM tbl_status_contrato WHERE status = :status"),{"status": row.get("Status")}).scalar()
-        inserir_contrato(conn, row)
-
-
-        
 
 print("\nRegistros Inserido com sucesso!")    
 print(f"\nTotal de registros processados: {len(df)}")
-print(f"Registros válidos: {len(registros_validos)}")
 print(f"Registros inválidos: {len(registros_invalidos)}")
-print(f"\nClientes novos inseridos: {clientes_inseridos}")
-print(f"Clientes já existentes: {clientes_existentes}")
+print(f"\nClientes inseridos: {clientes_inseridos}")
+print(f"Clientes existentes: {clientes_existentes}")
+print(f"Contratos inseridos: {contratos_inseridos}")
 
 df = pd.json_normalize(registros_invalidos)
 df.columns = df.columns.str.replace('linha.', '')
